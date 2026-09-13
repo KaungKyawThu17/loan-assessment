@@ -6,7 +6,10 @@ use Livewire\Livewire;
 test('profile page is displayed', function () {
     $this->actingAs($user = User::factory()->create());
 
-    $this->get(route('profile.edit'))->assertOk();
+    $this->get(route('profile.edit'))
+        ->assertOk()
+        ->assertSeeLivewire('pages::settings.delete-account')
+        ->assertSee('Delete account');
 });
 
 test('profile information can be updated', function () {
@@ -48,7 +51,7 @@ test('user can delete their account', function () {
 
     $this->actingAs($user);
 
-    $response = Livewire::test('pages::settings.delete-user-modal')
+    $response = Livewire::test('pages::settings.delete-account')
         ->set('password', 'password')
         ->call('deleteUser');
 
@@ -65,11 +68,25 @@ test('correct password must be provided to delete account', function () {
 
     $this->actingAs($user);
 
-    $response = Livewire::test('pages::settings.delete-user-modal')
+    $response = Livewire::test('pages::settings.delete-account')
         ->set('password', 'wrong-password')
         ->call('deleteUser');
 
     $response->assertHasErrors(['password']);
 
     expect($user->fresh())->not->toBeNull();
+    $this->assertAuthenticatedAs($user);
+});
+
+test('profile updates reject another user email address', function () {
+    $user = User::factory()->create();
+    $otherUser = User::factory()->create();
+    $originalEmail = $user->email;
+
+    Livewire::actingAs($user)->test('pages::settings.profile')
+        ->set('email', $otherUser->email)
+        ->call('updateProfileInformation')
+        ->assertHasErrors(['email' => 'unique']);
+
+    expect($user->fresh()->email)->toBe($originalEmail);
 });

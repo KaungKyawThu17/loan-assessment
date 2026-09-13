@@ -30,6 +30,52 @@ test('security settings page can be rendered', function () {
     $response->assertSee('No passkeys yet');
     $response->assertSee('Two-factor authentication');
     $response->assertSee('Enable 2FA');
+    $response->assertSeeLivewire('pages::settings.two-factor-setup-modal');
+});
+
+test('enabled two factor authentication shows recovery codes from the settings component', function () {
+    $user = User::factory()->withTwoFactor()->create();
+
+    $this->actingAs($user)
+        ->withSession(['auth.password_confirmed_at' => time()])
+        ->get(route('security.edit'))
+        ->assertSeeLivewire('pages::settings.recovery-codes')
+        ->assertSee('2FA recovery codes')
+        ->assertSee('Disable 2FA');
+});
+
+test('two factor setup keeps its verification and reset steps together', function () {
+    $user = User::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::settings.two-factor-setup-modal', ['requiresConfirmation' => true])
+        ->call('startTwoFactorSetup')
+        ->assertHasNoErrors()
+        ->assertSet('manualSetupKey', fn (string $key): bool => $key !== '')
+        ->call('showVerificationIfNecessary')
+        ->assertSet('showVerificationStep', true)
+        ->assertSee('Verify authentication code')
+        ->set('code', '123')
+        ->call('confirmTwoFactor')
+        ->assertHasErrors(['code' => 'size'])
+        ->call('resetVerification')
+        ->assertSet('showVerificationStep', false)
+        ->assertSet('code', '')
+        ->call('closeModal')
+        ->assertSet('manualSetupKey', '')
+        ->assertSet('qrCodeSvg', '');
+
+    expect($user->fresh()->two_factor_confirmed_at)->toBeNull();
+});
+
+test('appearance settings still provide light dark and system themes', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)->get(route('appearance.edit'))
+        ->assertSee('Appearance settings')
+        ->assertSee('Light')
+        ->assertSee('Dark')
+        ->assertSee('System');
 });
 
 test('security settings page requires password confirmation when enabled', function () {
@@ -109,5 +155,10 @@ test('correct password must be provided to update password', function () {
         ->set('password_confirmation', 'new-password')
         ->call('updatePassword');
 
-    $response->assertHasErrors(['current_password']);
+    $response->assertHasErrors(['current_password'])
+        ->assertSet('current_password', '')
+        ->assertSet('password', '')
+        ->assertSet('password_confirmation', '');
+
+    expect(Hash::check('password', $user->fresh()->password))->toBeTrue();
 });

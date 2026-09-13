@@ -2,15 +2,13 @@
 
 namespace App\Actions\Fortify;
 
-use App\Concerns\PasswordValidationRules;
 use App\Models\User;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rules\Password;
 use Laravel\Fortify\Contracts\ResetsUserPasswords;
 
 class ResetUserPassword implements ResetsUserPasswords
 {
-    use PasswordValidationRules;
-
     /**
      * Validate and reset the user's forgotten password.
      *
@@ -18,12 +16,11 @@ class ResetUserPassword implements ResetsUserPasswords
      */
     public function reset(User $user, array $input): void
     {
-        Validator::make($input, [
-            'password' => $this->passwordRules(),
+        $validated = Validator::make($input, [
+            'password' => ['required', 'string', Password::default(), 'confirmed'],
         ])->validate();
 
-        $user->forceFill([
-            'password' => $input['password'],
-        ])->save();
+        $user->password = $validated['password'];
+        $user->save();
     }
 }
