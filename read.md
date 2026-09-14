@@ -153,7 +153,7 @@ Registering through the website creates a customer account.
 ## Run tests
 
 ```bash
-php artisan test --compact --no-interaction
+php artisan test --compact
 ```
 
 Tests use a separate SQLite database in memory. PHP needs SQLite support even when your development database uses MySQL.
